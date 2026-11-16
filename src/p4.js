@@ -9,6 +9,7 @@ function show(node,o){
   node.style.visibility=off?'hidden':'visible';
   if('inert' in node){node.inert=off;}
 }
+var bar=document.querySelector('.bar');
 function overlays(p){
   var q=clamp((p-0.52)/0.46);
   show(caps[0],clamp((0.085-p)/0.035));
@@ -29,6 +30,7 @@ function draw(p,t){
     if(ia<1){ctx.fillStyle='rgba(42,28,18,'+(1-ia)+')';ctx.fillRect(0,0,W,H);}
   }
   overlays(p);
+  bar.classList.toggle('in',p>=0.5);
 }
 var pT=0,pC=0,last=0,time=0;
 function target(){var r=journey.getBoundingClientRect();return clamp(-r.top/Math.max(1,r.height-H));}
