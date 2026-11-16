@@ -730,6 +730,17 @@ function camAt(q,D){
   return 2*D;
 }
 var pieImg=new Image();pieImg.onload=function(){dirty=true;};pieImg.src='assets/pies.jpg';
+/* clips load only once the visitor nears the shop, and not at all on a data-saver connection */
+function mkVid(){var v=document.createElement('video');v.muted=true;v.playsInline=true;v.setAttribute('muted','');v.setAttribute('playsinline','');v.preload='auto';
+  v.addEventListener('seeked',function(){dirty=true;});v.addEventListener('loadeddata',function(){dirty=true;});return v;}
+var vids=[mkVid(),mkVid()],vidSrc=['assets/coffee.mp4','assets/pie.mp4'],vidsOn=false;
+function warmVids(){
+  if(vidsOn){return;}vidsOn=true;
+  var cn=navigator.connection;if(cn&&cn.saveData){return;}
+  vids.forEach(function(v,n){v.src=vidSrc[n];v.load();});
+}
+function vidReady(v){return v.readyState>=2&&v.videoWidth>0;}
+function seekTo(v,f){var d=v.duration;if(!(d>0)){return;}var tt=clamp(f)*(d-0.08);if(!v.seeking&&Math.abs(v.currentTime-tt)>0.03){v.currentTime=tt;}}
 function drawInterior(q,t){
   var wide=W>760,u=Math.min(H/100,W/70)*(wide?1.3:0.84),cx=wide?W*0.67:W*0.5,cy=wide?H*0.55:H*0.3,c=camAt(q,1),i,k,g,TAU=6.2832;
   function lg(x0,y0,x1,y1,s){var a=ctx.createLinearGradient(x0,y0,x1,y1);for(var n=0;n<s.length;n+=2){a.addColorStop(s[n],s[n+1]);}return a;}
@@ -886,14 +897,19 @@ function drawInterior(q,t){
     var an=i*2.399,dp=(((i*0.171+c*0.55+(reduce?0:t*0.004))%1)+1)%1,rad=(0.08+dp*dp*0.9)*M,bx=cx+Math.cos(an)*rad,by=cy-6*u+Math.sin(an)*rad*0.7,br=(2+dp*9+(i%3)*1.5)*u,al=Math.sin(dp*Math.PI)*(0.16+(i%4)*0.035);
     ctx.fillStyle=rg(bx,by,br,[0,'rgba(255,210,135,'+al.toFixed(3)+')',1,'rgba(255,210,135,0)']);ctx.fillRect(bx-br,by-br,br*2,br*2);
   }
-  /* the pies are a real photo from the store: the view travels up the trays as you scroll */
-  var pd=c-1,pa=clamp(1-Math.abs(pd)*2.4),photo=pieImg.complete&&pieImg.naturalWidth>0;
-  if(photo&&pa>0){
-    var px0=wide?W*0.4:0,pw=W-px0,pt=clamp((q-0.3)/0.38),zm=1.02+0.1*pt;
-    var sc=Math.max(pw/pieImg.naturalWidth,H*1.12/pieImg.naturalHeight)*zm,iw=pieImg.naturalWidth*sc,ih=pieImg.naturalHeight*sc;
-    var ix=px0+(pw-iw)/2+pd*W*0.25,iy=-(ih-H)*(1-pt);
+  /* coffee and pie stops: a short clip scrubbed by the scroll. The pie falls back to the store's photo, coffee to the drawing. */
+  var photo=pieImg.complete&&pieImg.naturalWidth>0,has=[false,false,false],m;
+  for(m=0;m<2;m++){
+    var pd=c-m,pa=clamp(1-Math.abs(pd)*2.4),v=vids[m],pt=m?clamp((q-0.3)/0.38):clamp(q/0.3),vr=vidReady(v),src=vr?v:(m===1&&photo?pieImg:null);
+    if(vr||(m===1&&photo)){has[m]=true;}
+    if(!src||pa<=0){continue;}
+    if(vr){seekTo(v,reduce?0.6:pt);}
+    var sw=vr?v.videoWidth:pieImg.naturalWidth,sh=vr?v.videoHeight:pieImg.naturalHeight;
+    var px0=wide?W*0.4:0,pw=W-px0,zm=vr?1.02+0.06*pt:1.02+0.1*pt;
+    var sc=Math.max(pw/sw,H*(vr?1:1.12)/sh)*zm,iw=sw*sc,ih=sh*sc;
+    var ix=px0+(pw-iw)/2+pd*W*0.25,iy=vr?(H-ih)/2:-(ih-H)*(1-pt);
     ctx.save();ctx.globalAlpha=pa;ctx.beginPath();ctx.rect(px0,0,pw,H);ctx.clip();
-    ctx.drawImage(pieImg,ix,iy,iw,ih);
+    ctx.drawImage(src,ix,iy,iw,ih);
     ctx.fillStyle=lg(0,0,0,H,[0,'rgba(23,14,8,0.55)',0.22,'rgba(23,14,8,0)',0.7,'rgba(23,14,8,0)',1,'rgba(23,14,8,0.6)']);ctx.fillRect(px0,0,pw,H);
     if(wide){ctx.fillStyle=lg(px0,0,px0+pw*0.3,0,[0,'rgba(40,26,17,1)',1,'rgba(40,26,17,0)']);ctx.fillRect(px0,0,pw*0.3+1,H);}
     ctx.restore();
@@ -902,7 +918,7 @@ function drawInterior(q,t){
   var scenes=[coffee,pie,produce];
   for(i=2;i>=0;i--){
     var d=c-i,s,a,x=cx,y=cy;
-    if(d<=-1||d>=0.9||(i===1&&photo)){continue;}
+    if(d<=-1||d>=0.9||has[i]){continue;}
     if(d<0){s=1/(1-2.4*d);a=clamp((d+0.62)*2.6);y=cy-(1-s)*5*u;}
     else{s=1/(1-0.72*d);a=clamp((0.85-d)*3);x=cx+(i%2?-1:1)*d*d*W*0.9;y=cy+d*d*H*0.12;}
     var near=1-clamp(Math.abs(d)*2.2);
@@ -934,6 +950,7 @@ function overlays(p){
   show(stops[2],clamp((q-0.74)/0.04));
 }
 function draw(p,t){
+  if(p>0.3){warmVids();}
   ctx.clearRect(0,0,W,H);ctx.globalAlpha=1;
   if(p<0.5){
     drawOutdoor(p,t);

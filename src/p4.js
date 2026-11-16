@@ -19,6 +19,7 @@ function overlays(p){
   show(stops[2],clamp((q-0.74)/0.04));
 }
 function draw(p,t){
+  if(p>0.3){warmVids();}
   ctx.clearRect(0,0,W,H);ctx.globalAlpha=1;
   if(p<0.5){
     drawOutdoor(p,t);
